@@ -1,0 +1,9 @@
+{
+  "id": "todo-collector",
+  "name": "TODO Collector",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "Automatically collects unchecked tasks from all notes into a single file with backlinks",
+  "author": "Charles",
+  "isDesktopOnly": false
+}

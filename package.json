@@ -1,0 +1,18 @@
+{
+  "name": "todo-collector",
+  "version": "1.0.0",
+  "main": "main.js",
+  "scripts": {
+    "dev": "esbuild main.ts --bundle --external:obsidian --outfile=main.js --format=cjs --watch",
+    "build": "esbuild main.ts --bundle --external:obsidian --outfile=main.js --format=cjs"
+  },
+  "devDependencies": {
+    "@types/node": "^16.11.6",
+    "esbuild": "^0.17.0",
+    "obsidian": "latest",
+    "typescript": "^4.7.4"
+  },
+  "dependencies": {
+    "monkey-around": "^3.0.0"
+  }
+}
