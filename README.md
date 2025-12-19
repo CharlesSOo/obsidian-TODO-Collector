@@ -8,15 +8,19 @@ This plugin scans your vault for unchecked tasks and puts them in a single file.
 
 **Collect** - Automatically gathers `- [ ]` tasks from your notes into one TODO file.
 
-**Organize by time** - Optional sections for Today, Tomorrow, Next 7 Days, and Backlog. Drag tasks between sections to prioritize.
+**Organize by time** - Optional sections for Today, Tomorrow, Next 7 Days, and Backlog with task counts.
 
-**Drag and drop** - In reading mode, drag tasks to reorder or move between sections. Grip dots appear when you hover.
+**Drag and drop** - Works in both Reading mode and Live Preview. Drag tasks to reorder or drop on section headers to move between sections.
 
-**Hotkeys** - Commands to move tasks between sections. Assign your own shortcuts in Settings > Hotkeys.
+**Hotkeys** - Commands to move tasks between sections. Assign shortcuts in Settings > Hotkeys.
 
 **Pin to top** - Keep your TODO file at the top of the sidebar regardless of sort order.
 
 **Two-way sync** - Check off a task in the TODO file and it gets checked off in the source note too.
+
+**Decay timer** - Completed tasks show a countdown and auto-remove after a set number of days.
+
+**Quick open** - Command to jump to your TODO file from anywhere.
 
 ## Settings
 
@@ -25,6 +29,8 @@ This plugin scans your vault for unchecked tasks and puts them in a single file.
 - Pin to top of sidebar
 - Time-based groups
 - Show completed section
+- Decay days (1-14 days or Never)
+- Show decay countdown
 
 ## Install
 
