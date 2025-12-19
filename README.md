@@ -2,33 +2,65 @@
 
 A simple plugin that gathers all your unchecked tasks from across your vault into one file.
 
+![Screenshot](assets/screenshot.png)
+
 ## What it does
 
 Every time you save a note, this plugin scans your vault for unchecked markdown tasks (`- [ ]`) and collects them into a single TODO file. Each task includes a backlink to the original note so you can jump straight to the source.
-
-The output looks like this:
-
-```markdown
-# Collected TODOs
-
-- [ ] Fix the login bug [[Project Notes]]
-- [ ] Buy groceries [[Daily/2024-01-15]]
-- [ ] Review PR #42 [[Work]]
-```
 
 ## Features
 
 - Automatic collection on file save
 - Backlinks to source notes
-- Pin your TODO file to the top of the file explorer (works with any sort order)
-- Pin icon indicator
+- Pin TODO file to top of file explorer (works with any sort order)
+- Time-based groups with drag-and-drop
+- Two-way sync - checking off a task in the TODO file also checks it in the source note
+- Completed section for checked tasks
 - Exclude specific folders from scanning
+
+## Time-Based Groups
+
+Enable this in settings to organize your TODOs into sections:
+
+```markdown
+## Today
+
+- [ ] Urgent task [[Daily Notes]]
+
+## Tomorrow
+
+- [ ] Less urgent [[Project]]
+
+## Next 7 Days
+
+- [ ] This week sometime [[Ideas]]
+
+## Backlog
+
+- [ ] Eventually [[Someday]]
+```
+
+**Drag and drop** (Reading mode):
+- Drag tasks between sections to re-categorize
+- Drag tasks onto other tasks to reorder
+- Drop into empty space below a section header
+- Grip dots appear on hover
+
+**Keyboard commands** (any mode):
+- Move task to Today
+- Move task to Tomorrow
+- Move task to Next 7 Days
+- Move task to Backlog
+
+To assign hotkeys: **Settings > Hotkeys**, search "TODO Collector"
 
 ## Settings
 
 - **Output file path** - Where to save the collected TODOs (default: `TODO.md`)
 - **Excluded folders** - Comma-separated list of folders to ignore
 - **Pin to top** - Keep the TODO file at the top of the sidebar
+- **Time-based groups** - Enable Today/Tomorrow/Next 7 Days/Backlog sections
+- **Show checked section** - Move completed tasks to a section at the bottom
 
 ## Installation
 
@@ -48,11 +80,16 @@ The output looks like this:
 
 ## Commands
 
-- **Refresh TODO collection** - Manually trigger a collection (useful if auto-update missed something)
+- **Refresh TODO collection** - Manually trigger a collection
+- **Move task to Today** - Move current task to Today section
+- **Move task to Tomorrow** - Move current task to Tomorrow section
+- **Move task to Next 7 Days** - Move current task to Next 7 Days section
+- **Move task to Backlog** - Move current task to Backlog section
 
-## Notes
+## Credits
 
-The pin feature uses monkey-patching to intercept Obsidian's file sorting. This means your TODO file stays at the top regardless of how you sort the file explorer. All other files maintain their normal sort order.
+- [monkey-around](https://github.com/pjeby/monkey-around) - Used for file explorer pinning
+- [Draggable Tasklists](https://github.com/fr33lo/draggable-tasklists-plugin) - Drag-and-drop implementation reference
 
 ## License
 
