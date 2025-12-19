@@ -1,5 +1,7 @@
 import { App, Plugin, PluginSettingTab, Setting, TFile, MarkdownPostProcessorContext, Editor, MarkdownView, Platform } from 'obsidian';
 import { around } from 'monkey-around';
+import { ViewPlugin, ViewUpdate, DecorationSet, Decoration, EditorView, WidgetType } from '@codemirror/view';
+import { RangeSetBuilder } from '@codemirror/state';
 
 type TimeGroup = 'today' | 'tomorrow' | 'week' | 'backlog';
 
@@ -48,6 +50,198 @@ const DEFAULT_SETTINGS: TodoCollectorSettings = {
   decayDays: 0,
   showDecayCountdown: true
 };
+
+// Store dragged line globally for CM6 drag/drop
+let draggedLineNum: number | null = null;
+
+// CodeMirror 6 drag handle widget for Live Preview
+class DragHandleWidget extends WidgetType {
+  private plugin: TodoCollectorPlugin;
+  private lineNum: number;
+
+  constructor(plugin: TodoCollectorPlugin, lineNum: number) {
+    super();
+    this.plugin = plugin;
+    this.lineNum = lineNum;
+  }
+
+  toDOM(view: EditorView): HTMLElement {
+    const isMobile = Platform.isMobile;
+    const handleSize = isMobile ? 32 : 18;
+    const iconSize = isMobile ? 18 : 14;
+
+    const handle = document.createElement('span');
+    handle.className = 'todo-drag-handle-cm6';
+    handle.draggable = true;
+    handle.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" fill="currentColor">
+      <circle cx="9" cy="6" r="2"/>
+      <circle cx="15" cy="6" r="2"/>
+      <circle cx="9" cy="12" r="2"/>
+      <circle cx="15" cy="12" r="2"/>
+      <circle cx="9" cy="18" r="2"/>
+      <circle cx="15" cy="18" r="2"/>
+    </svg>`;
+    handle.style.cssText = `
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: ${handleSize}px;
+      height: ${handleSize}px;
+      margin-right: 4px;
+      cursor: grab;
+      color: var(--text-muted);
+      opacity: 0;
+      transition: opacity 0.15s;
+      vertical-align: middle;
+    `;
+
+    handle.addEventListener('mouseenter', () => {
+      handle.style.opacity = '1';
+      handle.style.color = 'var(--text-normal)';
+    });
+
+    handle.addEventListener('mouseleave', () => {
+      handle.style.opacity = '0.3';
+      handle.style.color = 'var(--text-muted)';
+    });
+
+    handle.addEventListener('dragstart', (e) => {
+      draggedLineNum = this.lineNum;
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', 'todo-drag');
+      }
+      handle.style.cursor = 'grabbing';
+      handle.style.opacity = '1';
+    });
+
+    handle.addEventListener('dragend', () => {
+      handle.style.cursor = 'grab';
+      handle.style.opacity = '0';
+      draggedLineNum = null;
+    });
+
+    return handle;
+  }
+
+  eq(other: DragHandleWidget): boolean {
+    return this.lineNum === other.lineNum;
+  }
+
+  ignoreEvent(event: Event): boolean {
+    return false; // Allow all events through
+  }
+}
+
+// Create the Live Preview extension
+function createLivePreviewExtension(plugin: TodoCollectorPlugin) {
+  return ViewPlugin.fromClass(
+    class {
+      decorations: DecorationSet;
+      plugin: TodoCollectorPlugin;
+
+      constructor(view: EditorView) {
+        this.plugin = plugin;
+        this.decorations = this.buildDecorations(view);
+      }
+
+      update(update: ViewUpdate) {
+        if (update.docChanged || update.viewportChanged) {
+          this.decorations = this.buildDecorations(update.view);
+        }
+      }
+
+      buildDecorations(view: EditorView): DecorationSet {
+        if (!this.plugin.settings.enableTimeGroups) {
+          return Decoration.none;
+        }
+
+        const builder = new RangeSetBuilder<Decoration>();
+        const doc = view.state.doc;
+
+        for (let i = 1; i <= doc.lines; i++) {
+          const line = doc.line(i);
+          const text = line.text;
+
+          // Match task lines: - [ ] or - [x]
+          if (/^\s*-\s*\[[ x]\]/i.test(text)) {
+            const deco = Decoration.widget({
+              widget: new DragHandleWidget(this.plugin, i),
+              side: -1 // Before the line content
+            });
+            builder.add(line.from, line.from, deco);
+          }
+        }
+
+        return builder.finish();
+      }
+    },
+    {
+      decorations: (v) => v.decorations,
+      eventHandlers: {
+        dragover(e: DragEvent, view: EditorView) {
+          e.preventDefault();
+          if (e.dataTransfer) {
+            e.dataTransfer.dropEffect = 'move';
+          }
+        },
+        drop(e: DragEvent, view: EditorView) {
+          e.preventDefault();
+
+          const fromLine = draggedLineNum;
+          if (!fromLine || fromLine < 1) return;
+
+          const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
+          if (pos === null) return;
+
+          const doc = view.state.doc;
+          if (fromLine > doc.lines) return;
+
+          const toLine = doc.lineAt(pos).number;
+          if (fromLine === toLine) return;
+
+          const fromText = doc.line(fromLine).text;
+          const toText = doc.line(toLine).text;
+
+          // Check if dropping on a section header
+          const isHeader = /^##\s/.test(toText);
+
+          // Build new document
+          const lines: string[] = [];
+          for (let i = 1; i <= doc.lines; i++) {
+            if (i === fromLine) continue; // Skip source line
+
+            const lineText = doc.line(i).text;
+
+            if (isHeader && i === toLine) {
+              // Dropping on header - add line right after header
+              lines.push(lineText);
+              lines.push(fromText);
+            } else if (!isHeader && i === toLine) {
+              // Dropping on task - insert before or after based on direction
+              if (fromLine > toLine) {
+                lines.push(fromText);
+                lines.push(lineText);
+              } else {
+                lines.push(lineText);
+                lines.push(fromText);
+              }
+            } else {
+              lines.push(lineText);
+            }
+          }
+
+          view.dispatch({
+            changes: { from: 0, to: doc.length, insert: lines.join('\n') }
+          });
+
+          // Trigger immediate update instead of waiting for debounce
+          setTimeout(() => plugin.processCheckedItems(), 50);
+        }
+      }
+    }
+  );
+}
 
 export default class TodoCollectorPlugin extends Plugin {
   settings: TodoCollectorSettings = DEFAULT_SETTINGS;
@@ -135,6 +329,9 @@ export default class TodoCollectorPlugin extends Plugin {
     this.registerMarkdownPostProcessor((el: HTMLElement, ctx: MarkdownPostProcessorContext) => {
       this.addDragDropHandlers(el, ctx);
     });
+
+    // Register CodeMirror 6 extension for Live Preview drag
+    this.registerEditorExtension(createLivePreviewExtension(this));
 
     this.addSettingTab(new TodoCollectorSettingTab(this.app, this));
   }

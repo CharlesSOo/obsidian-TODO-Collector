@@ -3,10 +3,12 @@
   "version": "1.0.0",
   "main": "main.js",
   "scripts": {
-    "dev": "esbuild main.ts --bundle --external:obsidian --outfile=main.js --format=cjs --watch",
-    "build": "esbuild main.ts --bundle --external:obsidian --outfile=main.js --format=cjs"
+    "dev": "esbuild main.ts --bundle --external:obsidian --external:@codemirror/* --outfile=main.js --format=cjs --watch",
+    "build": "esbuild main.ts --bundle --external:obsidian --external:@codemirror/* --outfile=main.js --format=cjs"
   },
   "devDependencies": {
+    "@codemirror/state": "^6.5.2",
+    "@codemirror/view": "^6.39.4",
     "@types/node": "^16.11.6",
     "esbuild": "^0.17.0",
     "obsidian": "latest",
