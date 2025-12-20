@@ -1136,7 +1136,7 @@ class TodoCollectorSettingTab extends PluginSettingTab {
       .setName('Excluded folders')
       .setDesc('Comma-separated list of folders to skip (e.g., templates, archive).')
       .addText(text => text
-        .setPlaceholder('Templates, Archive')
+        .setPlaceholder('Templates, archive')
         .setValue(this.plugin.settings.excludeFolders.join(', '))
         .onChange(async (value) => {
           this.plugin.settings.excludeFolders = value.split(',').map(s => s.trim()).filter(s => s.length > 0);
