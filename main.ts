@@ -345,7 +345,7 @@ export default class TodoCollectorPlugin extends Plugin {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
 
     if (data?.itemGroups) {
-      const entries: [string, TimeGroup][] = Object.entries(data.itemGroups) as [string, TimeGroup][];
+      const entries = Object.entries(data.itemGroups) as [string, TimeGroup][];
       this.itemGroups = new Map(entries);
     }
     if (data?.itemOrder) {
@@ -1128,7 +1128,7 @@ class TodoCollectorSettingTab extends PluginSettingTab {
       .setName('Excluded folders')
       .setDesc('Comma-separated list of folders to skip (e.g., templates, archive).')
       .addText(text => text
-        .setPlaceholder('Templates, Archive')
+        .setPlaceholder('templates, archive')
         .setValue(this.plugin.settings.excludeFolders.join(', '))
         .onChange(async (value) => {
           this.plugin.settings.excludeFolders = value.split(',').map(s => s.trim()).filter(s => s.length > 0);
@@ -1148,7 +1148,7 @@ class TodoCollectorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Time-based groups')
-      .setDesc('Organize todos into sections: Today, Tomorrow, Next 7 days, Backlog. Drag items between sections in reading mode.')
+      .setDesc('Organize todos into sections: today, tomorrow, next 7 days, backlog. Drag items between sections in reading mode.')
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.enableTimeGroups)
         .onChange(async (value) => {
