@@ -26,6 +26,13 @@ interface TodoCollectorSettings {
   showDecayCountdown: boolean;
 }
 
+// Type for saved plugin data
+interface SavedPluginData extends TodoCollectorSettings {
+  itemGroups?: Record<string, TimeGroup>;
+  itemOrder?: Record<TimeGroup, string[]>;
+  completedTimestamps?: Record<string, number>;
+}
+
 // Type for file explorer view
 interface FileExplorerView {
   requestSort?: () => void;
@@ -341,12 +348,13 @@ export default class TodoCollectorPlugin extends Plugin {
   }
 
   async loadSettings() {
-    const data = await this.loadData();
+    const data = await this.loadData() as SavedPluginData | null;
     this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
 
     if (data?.itemGroups) {
-      const entries = Object.entries(data.itemGroups) as [string, TimeGroup][];
-      this.itemGroups = new Map(entries);
+      for (const [key, value] of Object.entries(data.itemGroups)) {
+        this.itemGroups.set(key, value);
+      }
     }
     if (data?.itemOrder) {
       this.itemOrder = {
@@ -1128,7 +1136,7 @@ class TodoCollectorSettingTab extends PluginSettingTab {
       .setName('Excluded folders')
       .setDesc('Comma-separated list of folders to skip (e.g., templates, archive).')
       .addText(text => text
-        .setPlaceholder('templates, archive')
+        .setPlaceholder('Templates, Archive')
         .setValue(this.plugin.settings.excludeFolders.join(', '))
         .onChange(async (value) => {
           this.plugin.settings.excludeFolders = value.split(',').map(s => s.trim()).filter(s => s.length > 0);
