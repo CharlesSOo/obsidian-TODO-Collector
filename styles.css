@@ -1,0 +1,158 @@
+/* TODO Collector Plugin Styles */
+
+/* Drag handle base styles */
+.todo-drag-handle,
+.todo-drag-handle-cm6 {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  vertical-align: middle;
+  border-radius: 3px;
+}
+
+/* Desktop drag handle */
+.todo-drag-handle {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 100%;
+}
+
+/* Mobile drag handle */
+.todo-drag-handle.is-mobile {
+  width: 32px;
+  min-height: 44px;
+  opacity: 0.5;
+}
+
+/* CM6 drag handle (Live Preview) */
+.todo-drag-handle-cm6 {
+  width: 18px;
+  height: 18px;
+  margin-right: 4px;
+}
+
+.todo-drag-handle-cm6.is-mobile {
+  width: 32px;
+  height: 32px;
+}
+
+/* Hover states */
+.todo-drag-handle-hover,
+.todo-drag-handle:hover,
+.todo-drag-handle-cm6:hover {
+  opacity: 1;
+  color: var(--text-normal);
+  background-color: var(--background-modifier-hover);
+}
+
+.todo-drag-handle-visible {
+  opacity: 0.7;
+  background-color: var(--background-modifier-hover);
+}
+
+.todo-drag-handle-muted {
+  opacity: 0.7;
+  color: var(--text-muted);
+}
+
+.todo-drag-handle-hidden {
+  opacity: 0;
+  background-color: transparent;
+}
+
+/* Grabbing cursor when dragging */
+.todo-drag-handle-grabbing,
+.todo-drag-handle.is-grabbing,
+.todo-drag-handle-cm6.is-grabbing {
+  cursor: grabbing;
+}
+
+/* Touch/mobile active state */
+.todo-drag-handle-active {
+  opacity: 1;
+  background-color: var(--background-modifier-hover);
+}
+
+/* Task item being dragged */
+.todo-item-dragging {
+  opacity: 0.5;
+}
+
+/* Drop indicator - above */
+.todo-drop-above {
+  border-top: 3px solid var(--interactive-accent);
+  margin-top: -3px;
+}
+
+/* Drop indicator - below */
+.todo-drop-below {
+  border-bottom: 3px solid var(--interactive-accent);
+}
+
+/* Clear drop indicator */
+.todo-drop-none {
+  border-top: none;
+  border-bottom: none;
+  margin-top: 0;
+}
+
+/* Task list item with drag handle */
+.todo-task-item {
+  position: relative;
+  padding-left: 24px;
+  margin-left: -24px;
+}
+
+.todo-task-item.is-mobile {
+  padding-left: 36px;
+  margin-left: -36px;
+}
+
+/* Section header drop target */
+.todo-header-drop {
+  transition: background-color 0.2s;
+}
+
+.todo-header-drop-active {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+/* UL drop target */
+.todo-ul-drop {
+  min-height: 40px;
+  padding-bottom: 20px;
+}
+
+.todo-ul-drop-active {
+  background-color: var(--background-modifier-hover);
+}
+
+/* Empty section drop zone */
+.todo-drop-zone {
+  min-height: 40px;
+  margin: 8px 0;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.todo-drop-zone-active {
+  background-color: var(--background-modifier-hover);
+  border: 2px dashed var(--interactive-accent);
+}
+
+/* Pin icon in file explorer */
+.todo-pin-icon {
+  margin-right: 2px;
+  margin-left: -18px;
+  opacity: 0.6;
+  display: inline-flex;
+  align-items: center;
+}

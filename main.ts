@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting, TFile, MarkdownPostProcessorContext, Editor, MarkdownView, Platform } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, TFile, TAbstractFile, MarkdownPostProcessorContext, Editor, MarkdownView, Platform, setIcon } from 'obsidian';
 import { around } from 'monkey-around';
 import { ViewPlugin, ViewUpdate, DecorationSet, Decoration, EditorView, WidgetType } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
@@ -26,10 +26,25 @@ interface TodoCollectorSettings {
   showDecayCountdown: boolean;
 }
 
+// Type for file explorer view
+interface FileExplorerView {
+  requestSort?: () => void;
+  constructor: {
+    prototype: {
+      getSortedFolderItems: (folder: TAbstractFile, ...args: unknown[]) => { file?: TAbstractFile }[];
+    };
+  };
+}
+
+// Type for folder items
+interface FolderItem {
+  file?: TAbstractFile;
+}
+
 const TIME_GROUP_HEADERS: Record<TimeGroup, string> = {
   today: 'Today',
   tomorrow: 'Tomorrow',
-  week: 'Next 7 Days',
+  week: 'Next 7 days',
   backlog: 'Backlog'
 };
 
@@ -67,42 +82,22 @@ class DragHandleWidget extends WidgetType {
 
   toDOM(view: EditorView): HTMLElement {
     const isMobile = Platform.isMobile;
-    const handleSize = isMobile ? 32 : 18;
-    const iconSize = isMobile ? 18 : 14;
 
     const handle = document.createElement('span');
     handle.className = 'todo-drag-handle-cm6';
+    if (isMobile) {
+      handle.addClass('is-mobile');
+    }
     handle.draggable = true;
-    handle.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" fill="currentColor">
-      <circle cx="9" cy="6" r="2"/>
-      <circle cx="15" cy="6" r="2"/>
-      <circle cx="9" cy="12" r="2"/>
-      <circle cx="15" cy="12" r="2"/>
-      <circle cx="9" cy="18" r="2"/>
-      <circle cx="15" cy="18" r="2"/>
-    </svg>`;
-    handle.style.cssText = `
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: ${handleSize}px;
-      height: ${handleSize}px;
-      margin-right: 4px;
-      cursor: grab;
-      color: var(--text-muted);
-      opacity: 0;
-      transition: opacity 0.15s;
-      vertical-align: middle;
-    `;
+    setIcon(handle, 'grip-vertical');
 
     handle.addEventListener('mouseenter', () => {
-      handle.style.opacity = '1';
-      handle.style.color = 'var(--text-normal)';
+      handle.addClass('todo-drag-handle-hover');
     });
 
     handle.addEventListener('mouseleave', () => {
-      handle.style.opacity = '0.3';
-      handle.style.color = 'var(--text-muted)';
+      handle.removeClass('todo-drag-handle-hover');
+      handle.addClass('todo-drag-handle-muted');
     });
 
     handle.addEventListener('dragstart', (e) => {
@@ -111,13 +106,13 @@ class DragHandleWidget extends WidgetType {
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', 'todo-drag');
       }
-      handle.style.cursor = 'grabbing';
-      handle.style.opacity = '1';
+      handle.addClass('todo-drag-handle-grabbing');
+      handle.addClass('todo-drag-handle-hover');
     });
 
     handle.addEventListener('dragend', () => {
-      handle.style.cursor = 'grab';
-      handle.style.opacity = '0';
+      handle.removeClass('todo-drag-handle-grabbing');
+      handle.removeClass('todo-drag-handle-hover');
       draggedLineNum = null;
     });
 
@@ -128,7 +123,7 @@ class DragHandleWidget extends WidgetType {
     return this.lineNum === other.lineNum;
   }
 
-  ignoreEvent(event: Event): boolean {
+  ignoreEvent(): boolean {
     return false; // Allow all events through
   }
 }
@@ -179,7 +174,7 @@ function createLivePreviewExtension(plugin: TodoCollectorPlugin) {
     {
       decorations: (v) => v.decorations,
       eventHandlers: {
-        dragover(e: DragEvent, view: EditorView) {
+        dragover(e: DragEvent) {
           e.preventDefault();
           if (e.dataTransfer) {
             e.dataTransfer.dropEffect = 'move';
@@ -236,7 +231,7 @@ function createLivePreviewExtension(plugin: TodoCollectorPlugin) {
           });
 
           // Trigger immediate update instead of waiting for debounce
-          setTimeout(() => plugin.processCheckedItems(), 50);
+          setTimeout(() => { void plugin.processCheckedItems(); }, 50);
         }
       }
     }
@@ -261,8 +256,8 @@ export default class TodoCollectorPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
 
-    this.app.workspace.onLayoutReady(async () => {
-      await this.collectAndWriteTodos();
+    this.app.workspace.onLayoutReady(() => {
+      void this.collectAndWriteTodos();
       this.patchFileExplorer();
     });
 
@@ -293,37 +288,37 @@ export default class TodoCollectorPlugin extends Plugin {
     this.addCommand({
       id: 'refresh-todos',
       name: 'Refresh TODO collection',
-      callback: () => this.collectAndWriteTodos()
+      callback: () => { void this.collectAndWriteTodos(); }
     });
 
     this.addCommand({
       id: 'move-to-today',
-      name: 'Move task to Today',
-      editorCallback: (editor: Editor, view: MarkdownView) => this.moveTaskToGroup(editor, view, 'today')
+      name: 'Move task to today',
+      editorCallback: (editor: Editor, view: MarkdownView) => { void this.moveTaskToGroup(editor, view, 'today'); }
     });
 
     this.addCommand({
       id: 'move-to-tomorrow',
-      name: 'Move task to Tomorrow',
-      editorCallback: (editor: Editor, view: MarkdownView) => this.moveTaskToGroup(editor, view, 'tomorrow')
+      name: 'Move task to tomorrow',
+      editorCallback: (editor: Editor, view: MarkdownView) => { void this.moveTaskToGroup(editor, view, 'tomorrow'); }
     });
 
     this.addCommand({
       id: 'move-to-week',
-      name: 'Move task to Next 7 Days',
-      editorCallback: (editor: Editor, view: MarkdownView) => this.moveTaskToGroup(editor, view, 'week')
+      name: 'Move task to next 7 days',
+      editorCallback: (editor: Editor, view: MarkdownView) => { void this.moveTaskToGroup(editor, view, 'week'); }
     });
 
     this.addCommand({
       id: 'move-to-backlog',
-      name: 'Move task to Backlog',
-      editorCallback: (editor: Editor, view: MarkdownView) => this.moveTaskToGroup(editor, view, 'backlog')
+      name: 'Move task to backlog',
+      editorCallback: (editor: Editor, view: MarkdownView) => { void this.moveTaskToGroup(editor, view, 'backlog'); }
     });
 
     this.addCommand({
       id: 'open-todo-file',
       name: 'Open TODO file',
-      callback: () => this.openTodoFile()
+      callback: () => { void this.openTodoFile(); }
     });
 
     this.registerMarkdownPostProcessor((el: HTMLElement, ctx: MarkdownPostProcessorContext) => {
@@ -379,25 +374,25 @@ export default class TodoCollectorPlugin extends Plugin {
   }
 
   patchFileExplorer() {
-    const plugin = this;
     const fileExplorerLeaf = this.app.workspace.getLeavesOfType('file-explorer')[0];
 
     if (!fileExplorerLeaf) {
-      console.log('TODO Collector: File explorer not found');
+      console.warn('TODO Collector: File explorer not found');
       return;
     }
 
-    const fileExplorer = fileExplorerLeaf.view as any;
+    const fileExplorer = fileExplorerLeaf.view as FileExplorerView;
+    const settings = this.settings;
 
     this.register(
       around(fileExplorer.constructor.prototype, {
-        getSortedFolderItems(original: any) {
-          return function(folder: any, ...args: any[]) {
+        getSortedFolderItems(original: (folder: TAbstractFile, ...args: unknown[]) => FolderItem[]) {
+          return function(this: FileExplorerView, folder: TAbstractFile & { isRoot?: () => boolean }, ...args: unknown[]) {
             const result = original.call(this, folder, ...args);
 
-            if (plugin.settings.pinToTop && folder && folder.isRoot()) {
+            if (settings.pinToTop && folder && folder.isRoot?.()) {
               const todoIndex = result.findIndex(
-                (item: any) => item.file?.path === plugin.settings.outputFilePath
+                (item: FolderItem) => item.file?.path === settings.outputFilePath
               );
 
               if (todoIndex > 0) {
@@ -418,7 +413,7 @@ export default class TodoCollectorPlugin extends Plugin {
   refreshFileExplorer() {
     const fileExplorerLeaf = this.app.workspace.getLeavesOfType('file-explorer')[0];
     if (fileExplorerLeaf) {
-      const fileExplorer = fileExplorerLeaf.view as any;
+      const fileExplorer = fileExplorerLeaf.view as FileExplorerView;
       if (fileExplorer.requestSort) {
         fileExplorer.requestSort();
       }
@@ -458,8 +453,7 @@ export default class TodoCollectorPlugin extends Plugin {
 
     const pinIcon = document.createElement('span');
     pinIcon.className = 'todo-pin-icon';
-    pinIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>`;
-    pinIcon.style.cssText = 'margin-right: 2px; margin-left: -18px; opacity: 0.6; display: inline-flex; align-items: center;';
+    setIcon(pinIcon, 'pin');
     todoTitle.insertBefore(pinIcon, todoTitle.firstChild);
   }
 
@@ -468,6 +462,7 @@ export default class TodoCollectorPlugin extends Plugin {
     if (ctx.sourcePath !== this.settings.outputFilePath) return;
 
     const taskItems = el.querySelectorAll('li.task-list-item');
+    const isMobile = Platform.isMobile;
 
     taskItems.forEach((item) => {
       const li = item as HTMLLIElement;
@@ -485,99 +480,70 @@ export default class TodoCollectorPlugin extends Plugin {
       const itemKey = `${taskText} [[${sourceBasename}]]`.toLowerCase().trim();
       li.setAttribute('data-todo-key', itemKey);
       li.setAttribute('draggable', 'true');
-      li.style.position = 'relative';
+      li.addClass('todo-task-item');
+      if (isMobile) {
+        li.addClass('is-mobile');
+      }
 
-      const isMobile = Platform.isMobile;
-      const handleSize = isMobile ? 32 : 20;
-      const padding = isMobile ? 36 : 24;
-
-      li.style.paddingLeft = `${padding}px`;
-      li.style.marginLeft = `-${padding}px`;
-
-      // Create drag handle with better visibility
+      // Create drag handle
       const dragHandle = document.createElement('span');
       dragHandle.className = 'todo-drag-handle';
-      const iconSize = isMobile ? 20 : 16;
-      dragHandle.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" fill="currentColor">
-        <circle cx="9" cy="6" r="2"/>
-        <circle cx="15" cy="6" r="2"/>
-        <circle cx="9" cy="12" r="2"/>
-        <circle cx="15" cy="12" r="2"/>
-        <circle cx="9" cy="18" r="2"/>
-        <circle cx="15" cy="18" r="2"/>
-      </svg>`;
-      dragHandle.style.cssText = `
-        position: absolute;
-        left: 0;
-        top: 50%;
-        transform: translateY(-50%);
-        opacity: ${isMobile ? '0.5' : '0'};
-        transition: opacity 0.15s ease;
-        cursor: grab;
-        color: var(--text-muted);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: ${handleSize}px;
-        height: 100%;
-        min-height: ${isMobile ? '44px' : 'auto'};
-        border-radius: 3px;
-      `;
+      if (isMobile) {
+        dragHandle.addClass('is-mobile');
+      }
+      setIcon(dragHandle, 'grip-vertical');
       li.insertBefore(dragHandle, li.firstChild);
 
       // Touch events for mobile
       if (isMobile) {
         dragHandle.addEventListener('touchstart', (e: TouchEvent) => {
           e.preventDefault();
-          dragHandle.style.opacity = '1';
-          dragHandle.style.backgroundColor = 'var(--background-modifier-hover)';
+          dragHandle.addClass('todo-drag-handle-active');
         });
 
         dragHandle.addEventListener('touchend', () => {
-          dragHandle.style.opacity = '0.5';
-          dragHandle.style.backgroundColor = '';
+          dragHandle.removeClass('todo-drag-handle-active');
+          dragHandle.addClass('is-mobile');
         });
       }
 
       li.addEventListener('mouseenter', () => {
-        dragHandle.style.opacity = '0.7';
-        dragHandle.style.backgroundColor = 'var(--background-modifier-hover)';
+        dragHandle.addClass('todo-drag-handle-visible');
       });
 
       li.addEventListener('mouseleave', () => {
-        dragHandle.style.opacity = '0';
-        dragHandle.style.backgroundColor = '';
-        li.style.borderTop = '';
-        li.style.borderBottom = '';
+        dragHandle.removeClass('todo-drag-handle-visible');
+        dragHandle.addClass('todo-drag-handle-hidden');
+        li.removeClass('todo-drop-above');
+        li.removeClass('todo-drop-below');
       });
 
       dragHandle.addEventListener('mouseenter', () => {
-        dragHandle.style.opacity = '1';
-        dragHandle.style.color = 'var(--text-normal)';
+        dragHandle.addClass('todo-drag-handle-hover');
       });
 
       dragHandle.addEventListener('mouseleave', () => {
-        dragHandle.style.opacity = '0.7';
-        dragHandle.style.color = 'var(--text-muted)';
+        dragHandle.removeClass('todo-drag-handle-hover');
+        dragHandle.addClass('todo-drag-handle-muted');
       });
 
       dragHandle.addEventListener('mousedown', () => {
-        dragHandle.style.cursor = 'grabbing';
+        dragHandle.addClass('todo-drag-handle-grabbing');
       });
 
       dragHandle.addEventListener('mouseup', () => {
-        dragHandle.style.cursor = 'grab';
+        dragHandle.removeClass('todo-drag-handle-grabbing');
       });
 
       li.addEventListener('dragstart', (e: DragEvent) => {
         if (!e.dataTransfer) return;
-        li.style.opacity = '0.5';
+        li.addClass('todo-item-dragging');
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', itemKey);
       });
 
       li.addEventListener('dragend', () => {
-        li.style.opacity = '';
+        li.removeClass('todo-item-dragging');
       });
 
       li.addEventListener('dragover', (e: DragEvent) => {
@@ -590,29 +556,25 @@ export default class TodoCollectorPlugin extends Plugin {
         const rect = li.getBoundingClientRect();
         const midY = rect.top + rect.height / 2;
 
+        li.removeClass('todo-drop-above');
+        li.removeClass('todo-drop-below');
         if (e.clientY < midY) {
-          li.style.borderTop = '3px solid var(--interactive-accent)';
-          li.style.borderBottom = '';
-          li.style.marginTop = '-3px';
+          li.addClass('todo-drop-above');
         } else {
-          li.style.borderBottom = '3px solid var(--interactive-accent)';
-          li.style.borderTop = '';
-          li.style.marginTop = '';
+          li.addClass('todo-drop-below');
         }
       });
 
       li.addEventListener('dragleave', () => {
-        li.style.borderTop = '';
-        li.style.borderBottom = '';
-        li.style.marginTop = '';
+        li.removeClass('todo-drop-above');
+        li.removeClass('todo-drop-below');
       });
 
-      li.addEventListener('drop', async (e: DragEvent) => {
+      li.addEventListener('drop', (e: DragEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        li.style.borderTop = '';
-        li.style.borderBottom = '';
-        li.style.marginTop = '';
+        li.removeClass('todo-drop-above');
+        li.removeClass('todo-drop-below');
 
         if (!e.dataTransfer) return;
 
@@ -624,7 +586,7 @@ export default class TodoCollectorPlugin extends Plugin {
         const rect = li.getBoundingClientRect();
         const insertBefore = e.clientY < rect.top + rect.height / 2;
 
-        await this.reorderItem(draggedKey, targetKey, insertBefore);
+        void this.reorderItem(draggedKey, targetKey, insertBefore);
       });
     });
 
@@ -638,33 +600,30 @@ export default class TodoCollectorPlugin extends Plugin {
       if (!HEADER_TO_GROUP[headerText]) return;
 
       const targetGroup = HEADER_TO_GROUP[headerText];
-      h2.style.transition = 'background-color 0.2s';
+      h2.addClass('todo-header-drop');
 
       h2.addEventListener('dragover', (e: DragEvent) => {
         e.preventDefault();
         if (e.dataTransfer) {
           e.dataTransfer.dropEffect = 'move';
         }
-        h2.style.backgroundColor = 'var(--interactive-accent)';
-        h2.style.color = 'var(--text-on-accent)';
+        h2.addClass('todo-header-drop-active');
       });
 
       h2.addEventListener('dragleave', () => {
-        h2.style.backgroundColor = '';
-        h2.style.color = '';
+        h2.removeClass('todo-header-drop-active');
       });
 
-      h2.addEventListener('drop', async (e: DragEvent) => {
+      h2.addEventListener('drop', (e: DragEvent) => {
         e.preventDefault();
-        h2.style.backgroundColor = '';
-        h2.style.color = '';
+        h2.removeClass('todo-header-drop-active');
 
         if (!e.dataTransfer) return;
 
         const itemKey = e.dataTransfer.getData('text/plain');
         if (!itemKey) return;
 
-        await this.moveItemToGroup(itemKey, targetGroup);
+        void this.moveItemToGroup(itemKey, targetGroup);
       });
 
       // Handle UL drop targets
@@ -675,8 +634,7 @@ export default class TodoCollectorPlugin extends Plugin {
 
       if (nextEl && nextEl.tagName === 'UL') {
         const ul = nextEl as HTMLUListElement;
-        ul.style.minHeight = '40px';
-        ul.style.paddingBottom = '20px';
+        ul.addClass('todo-ul-drop');
 
         ul.addEventListener('dragover', (e: DragEvent) => {
           if ((e.target as HTMLElement).tagName === 'UL') {
@@ -684,27 +642,27 @@ export default class TodoCollectorPlugin extends Plugin {
             if (e.dataTransfer) {
               e.dataTransfer.dropEffect = 'move';
             }
-            ul.style.backgroundColor = 'var(--background-modifier-hover)';
+            ul.addClass('todo-ul-drop-active');
           }
         });
 
         ul.addEventListener('dragleave', (e: DragEvent) => {
           if ((e.target as HTMLElement).tagName === 'UL') {
-            ul.style.backgroundColor = '';
+            ul.removeClass('todo-ul-drop-active');
           }
         });
 
-        ul.addEventListener('drop', async (e: DragEvent) => {
+        ul.addEventListener('drop', (e: DragEvent) => {
           if ((e.target as HTMLElement).tagName !== 'UL') return;
           e.preventDefault();
-          ul.style.backgroundColor = '';
+          ul.removeClass('todo-ul-drop-active');
 
           if (!e.dataTransfer) return;
 
           const itemKey = e.dataTransfer.getData('text/plain');
           if (!itemKey) return;
 
-          await this.moveItemToGroup(itemKey, targetGroup);
+          void this.moveItemToGroup(itemKey, targetGroup);
         });
       }
 
@@ -712,7 +670,6 @@ export default class TodoCollectorPlugin extends Plugin {
       if (!nextEl || nextEl.tagName === 'H2') {
         const dropZone = document.createElement('div');
         dropZone.className = 'todo-drop-zone';
-        dropZone.style.cssText = 'min-height: 40px; margin: 8px 0; border-radius: 4px; transition: background-color 0.2s;';
         h2.after(dropZone);
 
         dropZone.addEventListener('dragover', (e: DragEvent) => {
@@ -720,26 +677,23 @@ export default class TodoCollectorPlugin extends Plugin {
           if (e.dataTransfer) {
             e.dataTransfer.dropEffect = 'move';
           }
-          dropZone.style.backgroundColor = 'var(--background-modifier-hover)';
-          dropZone.style.border = '2px dashed var(--interactive-accent)';
+          dropZone.addClass('todo-drop-zone-active');
         });
 
         dropZone.addEventListener('dragleave', () => {
-          dropZone.style.backgroundColor = '';
-          dropZone.style.border = '';
+          dropZone.removeClass('todo-drop-zone-active');
         });
 
-        dropZone.addEventListener('drop', async (e: DragEvent) => {
+        dropZone.addEventListener('drop', (e: DragEvent) => {
           e.preventDefault();
-          dropZone.style.backgroundColor = '';
-          dropZone.style.border = '';
+          dropZone.removeClass('todo-drop-zone-active');
 
           if (!e.dataTransfer) return;
 
           const itemKey = e.dataTransfer.getData('text/plain');
           if (!itemKey) return;
 
-          await this.moveItemToGroup(itemKey, targetGroup);
+          void this.moveItemToGroup(itemKey, targetGroup);
         });
       }
     });
@@ -780,7 +734,7 @@ export default class TodoCollectorPlugin extends Plugin {
     await this.collectAndWriteTodos();
   }
 
-  moveTaskToGroup(editor: Editor, view: MarkdownView, targetGroup: TimeGroup) {
+  async moveTaskToGroup(editor: Editor, view: MarkdownView, targetGroup: TimeGroup) {
     if (!this.settings.enableTimeGroups) {
       return;
     }
@@ -801,10 +755,10 @@ export default class TodoCollectorPlugin extends Plugin {
     const itemContent = taskMatch[1].trim();
     const itemKey = itemContent.toLowerCase();
 
-    this.moveItemToGroup(itemKey, targetGroup);
+    await this.moveItemToGroup(itemKey, targetGroup);
   }
 
-  handleFileChange(file: any) {
+  handleFileChange(file: TAbstractFile) {
     if (!(file instanceof TFile) || file.extension !== 'md') return;
     if (this.isUpdatingOutputFile) return;
 
@@ -821,7 +775,7 @@ export default class TodoCollectorPlugin extends Plugin {
       clearTimeout(this.debounceTimer);
     }
     this.debounceTimer = setTimeout(() => {
-      this.processCheckedItems();
+      void this.processCheckedItems();
     }, 500);
   }
 
@@ -957,7 +911,7 @@ export default class TodoCollectorPlugin extends Plugin {
       clearTimeout(this.debounceTimer);
     }
     this.debounceTimer = setTimeout(() => {
-      this.collectAndWriteTodos();
+      void this.collectAndWriteTodos();
     }, 1000);
   }
 
@@ -1087,7 +1041,7 @@ export default class TodoCollectorPlugin extends Plugin {
     for (const group of groupOrder) {
       const count = groups[group].length;
       const countStr = count > 0 ? ` (${count})` : '';
-      output += `## ${TIME_GROUP_HEADERS[group]}${countStr}\n\n`;
+      output += `## ${TIME_GROUP_HEADERS[group]}${countStr}\n`;
       if (count > 0) {
         output += groups[group].map(item => item.line).join('\n') + '\n';
       }
@@ -1159,11 +1113,13 @@ class TodoCollectorSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl('h2', { text: 'TODO Collector Settings' });
+    new Setting(containerEl)
+      .setName('TODO Collector settings')
+      .setHeading();
 
     new Setting(containerEl)
       .setName('Output file path')
-      .setDesc('Path to the file where TODOs will be collected (relative to vault root)')
+      .setDesc('Path to the file where TODOs will be collected (relative to vault root).')
       .addText(text => text
         .setPlaceholder('TODOs.md')
         .setValue(this.plugin.settings.outputFilePath)
@@ -1174,10 +1130,10 @@ class TodoCollectorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Excluded folders')
-      .setDesc('Comma-separated list of folders to skip (e.g., templates,archive)')
+      .setDesc('Comma-separated list of folders to skip (e.g., templates, archive).')
       .addText(text => text
-        .setPlaceholder('templates,archive')
-        .setValue(this.plugin.settings.excludeFolders.join(','))
+        .setPlaceholder('templates, archive')
+        .setValue(this.plugin.settings.excludeFolders.join(', '))
         .onChange(async (value) => {
           this.plugin.settings.excludeFolders = value.split(',').map(s => s.trim()).filter(s => s.length > 0);
           await this.plugin.saveSettings();
@@ -1186,7 +1142,7 @@ class TodoCollectorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Pin to top of sidebar')
-      .setDesc('Keep the TODO file pinned to the top of the file explorer')
+      .setDesc('Keep the TODO file pinned to the top of the file explorer.')
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.pinToTop)
         .onChange(async (value) => {
@@ -1196,7 +1152,7 @@ class TodoCollectorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Time-based groups')
-      .setDesc('Organize TODOs into sections: Today, Tomorrow, Next 7 Days, Backlog. Drag items between sections in Reading mode.')
+      .setDesc('Organize TODOs into sections: Today, Tomorrow, Next 7 days, Backlog. Drag items between sections in reading mode.')
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.enableTimeGroups)
         .onChange(async (value) => {
@@ -1207,7 +1163,7 @@ class TodoCollectorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Show checked section')
-      .setDesc('When you check off a TODO, move it to a collapsible section')
+      .setDesc('When you check off a TODO, move it to a collapsible section.')
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.showCheckedSection)
         .onChange(async (value) => {
@@ -1217,7 +1173,7 @@ class TodoCollectorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Checked section header')
-      .setDesc('Text to show above completed items')
+      .setDesc('Text to show above completed items.')
       .addText(text => text
         .setPlaceholder('Completed')
         .setValue(this.plugin.settings.checkedSectionHeader)
@@ -1228,7 +1184,7 @@ class TodoCollectorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Decay days')
-      .setDesc('Days before completed tasks are removed from the list')
+      .setDesc('Days before completed tasks are removed from the list.')
       .addDropdown(dropdown => dropdown
         .addOptions({
           '1': '1 day',
@@ -1248,7 +1204,7 @@ class TodoCollectorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Show decay countdown')
-      .setDesc('Show days remaining next to completed tasks')
+      .setDesc('Show days remaining next to completed tasks.')
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.showDecayCountdown)
         .onChange(async (value) => {
