@@ -287,7 +287,7 @@ export default class TodoCollectorPlugin extends Plugin {
 
     this.addCommand({
       id: 'refresh-todos',
-      name: 'Refresh TODO collection',
+      name: 'Refresh todo collection',
       callback: () => { void this.collectAndWriteTodos(); }
     });
 
@@ -317,7 +317,7 @@ export default class TodoCollectorPlugin extends Plugin {
 
     this.addCommand({
       id: 'open-todo-file',
-      name: 'Open TODO file',
+      name: 'Open todo file',
       callback: () => { void this.openTodoFile(); }
     });
 
@@ -345,7 +345,8 @@ export default class TodoCollectorPlugin extends Plugin {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
 
     if (data?.itemGroups) {
-      this.itemGroups = new Map(Object.entries(data.itemGroups) as [string, TimeGroup][]);
+      const entries: [string, TimeGroup][] = Object.entries(data.itemGroups) as [string, TimeGroup][];
+      this.itemGroups = new Map(entries);
     }
     if (data?.itemOrder) {
       this.itemOrder = {
@@ -591,9 +592,8 @@ export default class TodoCollectorPlugin extends Plugin {
     });
 
     // Add drop handlers to section headers
-    const headers = el.querySelectorAll('h2');
-    headers.forEach((header) => {
-      const h2 = header as HTMLHeadingElement;
+    const headers = el.querySelectorAll<HTMLHeadingElement>('h2');
+    headers.forEach((h2) => {
       // Strip count from header text (e.g., "Today (3)" -> "today")
       const headerText = (h2.textContent?.toLowerCase() || '').replace(/\s*\(\d+\)$/, '');
 
@@ -1114,14 +1114,10 @@ class TodoCollectorSettingTab extends PluginSettingTab {
     containerEl.empty();
 
     new Setting(containerEl)
-      .setName('TODO Collector settings')
-      .setHeading();
-
-    new Setting(containerEl)
       .setName('Output file path')
-      .setDesc('Path to the file where TODOs will be collected (relative to vault root).')
+      .setDesc('Path to the file where todos will be collected (relative to vault root).')
       .addText(text => text
-        .setPlaceholder('TODOs.md')
+        .setPlaceholder('Todos.md')
         .setValue(this.plugin.settings.outputFilePath)
         .onChange(async (value) => {
           this.plugin.settings.outputFilePath = value || 'TODOs.md';
@@ -1132,7 +1128,7 @@ class TodoCollectorSettingTab extends PluginSettingTab {
       .setName('Excluded folders')
       .setDesc('Comma-separated list of folders to skip (e.g., templates, archive).')
       .addText(text => text
-        .setPlaceholder('templates, archive')
+        .setPlaceholder('Templates, Archive')
         .setValue(this.plugin.settings.excludeFolders.join(', '))
         .onChange(async (value) => {
           this.plugin.settings.excludeFolders = value.split(',').map(s => s.trim()).filter(s => s.length > 0);
@@ -1142,7 +1138,7 @@ class TodoCollectorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Pin to top of sidebar')
-      .setDesc('Keep the TODO file pinned to the top of the file explorer.')
+      .setDesc('Keep the todo file pinned to the top of the file explorer.')
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.pinToTop)
         .onChange(async (value) => {
@@ -1152,7 +1148,7 @@ class TodoCollectorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Time-based groups')
-      .setDesc('Organize TODOs into sections: Today, Tomorrow, Next 7 days, Backlog. Drag items between sections in reading mode.')
+      .setDesc('Organize todos into sections: Today, Tomorrow, Next 7 days, Backlog. Drag items between sections in reading mode.')
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.enableTimeGroups)
         .onChange(async (value) => {
@@ -1163,7 +1159,7 @@ class TodoCollectorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Show checked section')
-      .setDesc('When you check off a TODO, move it to a collapsible section.')
+      .setDesc('When you check off a todo, move it to a collapsible section.')
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.showCheckedSection)
         .onChange(async (value) => {
