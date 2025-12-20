@@ -3,7 +3,7 @@
   "name": "TODO Collector",
   "version": "1.0.0",
   "minAppVersion": "0.15.0",
-  "description": "Collects all unchecked tasks into one file with time-based sections and drag-and-drop",
+  "description": "Collects all unchecked tasks into one file with time-based sections and drag-and-drop.",
   "author": "CharlesSOo",
   "authorUrl": "https://github.com/CharlesSOo",
   "isDesktopOnly": false
